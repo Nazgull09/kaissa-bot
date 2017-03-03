@@ -5,6 +5,7 @@ module Kaissa.Bot.Monad(
   , ServerEnv
   , newServerEnv
   , runServerM
+  , runServerMIO
   , serverMToHandler
   -- * Helpers
   , getConfig
@@ -39,7 +40,9 @@ import Web.Telegram.API.Bot.Data
 import Web.Telegram.API.Bot.Requests
 import Web.Telegram.API.Bot.Responses
 
+import qualified Control.Immortal as Immortal
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Foldable as F
 
 -- | Environment of 'ServerM' monad
 data ServerEnv = ServerEnv {
@@ -52,15 +55,17 @@ data ServerEnv = ServerEnv {
 }
 
 -- | Create fresh server environment
-newServerEnv :: Config -> IO ServerEnv
-newServerEnv cfg = do
+newServerEnv :: Config -> (Update -> ServerM ()) -> IO ServerEnv
+newServerEnv cfg sink = do
   mng <- newManager tlsManagerSettings
   offsetRef <- liftIO $ newIORef Nothing
-  pure ServerEnv {
-      serverConfig  = cfg
-    , serverManager = mng
-    , serverTelegramOffset = offsetRef
-    }
+  let env = ServerEnv {
+          serverConfig  = cfg
+        , serverManager = mng
+        , serverTelegramOffset = offsetRef
+        }
+  runServerMIO env $ telegramWorker sink
+  pure env
 
 -- | Main monad of server, each handler of API operates in the monad.
 newtype ServerM a = ServerM { unServerM :: ReaderT ServerEnv (LoggingT Handler) a }
@@ -86,6 +91,14 @@ getManager = ServerM $ asks serverManager
 -- | Execute server monad to default servant handler
 runServerM :: ServerEnv -> ServerM a -> Handler a
 runServerM e m = runStdoutLoggingT $ runReaderT (unServerM m) e
+
+-- | Run server handler in IO monad
+runServerMIO :: ServerEnv -> ServerM a -> IO a
+runServerMIO e m = do
+  er <- runExceptT $ runServerM e m
+  case er of
+    Left er -> fail . show $ er
+    Right a -> pure a
 
 -- | Transformation from 'ServerM' monad to 'Handler'
 serverMToHandler :: ServerEnv -> ServerM :~> Handler
@@ -131,5 +144,11 @@ pollTelegramUpdates = do
       throwError err500 { errBody = BL.fromStrict $ showb e }
     Right resp -> do
       let upds = result resp
-      unless (null upds) $ liftIO $ writeIORef offsetRef (Just . maximum . fmap update_id $ upds)
+      unless (null upds) $ liftIO $ writeIORef offsetRef (Just . (+1) . maximum . fmap update_id $ upds)
       return upds
+
+-- | Make immortal worker that polls updates from telegram
+telegramWorker :: (Update -> ServerM ()) -> ServerM ()
+telegramWorker sink = void $ Immortal.createWithLabel "telegramWorker" $ const $ forever $ do
+  updates <- pollTelegramUpdates
+  F.traverse_ sink updates

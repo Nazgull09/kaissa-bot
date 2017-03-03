@@ -4,6 +4,8 @@ module Kaissa.Bot.Config(
   , configToken
   , configPollTimeout
   , configPollLimit
+  , configDetailedLogging
+  , configPort 
   , readConfig
   ) where
 
@@ -17,11 +19,15 @@ import GHC.Generics
 -- | Server configuration loaded from YAML
 data Config = Config {
   -- | Telegram API Bot Token
-  _configToken :: !Text
+  _configToken           :: !Text
   -- | Telegram API polling timeout in seconds (0 is for testing)
-, _configPollTimeout :: !(Maybe Int)
+, _configPollTimeout     :: !(Maybe Int)
   -- | Telegram API polling limits in count of messages
-, _configPollLimit   :: !(Maybe Int)
+, _configPollLimit       :: !(Maybe Int)
+  -- | Whether or not to log in detail requests
+, _configDetailedLogging :: !Bool
+  -- | Which port to use to host API
+, _configPort            :: !Int
 } deriving (Generic)
 
 makeLenses ''Config
@@ -31,6 +37,8 @@ instance FromJSON Config where
     <$> o .: "token"
     <*> o .:? "poll-timeout"
     <*> o .:? "poll-limit"
+    <*> o .: "detailed-logging"
+    <*> o .: "port"
   parseJSON _ = mzero
 
 -- | Read config from file

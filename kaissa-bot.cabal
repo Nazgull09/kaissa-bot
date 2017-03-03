@@ -27,6 +27,7 @@ library
     , bytestring          >= 0.10    && < 0.11
     , http-client         >= 0.5     && < 0.6
     , http-client-tls     >= 0.3     && < 0.4
+    , immortal            >= 0.2     && < 0.3
     , lens                >= 4.15    && < 4.16
     , monad-control       >= 1.0     && < 1.1
     , monad-logger        >= 0.3     && < 0.4
@@ -63,8 +64,13 @@ executable kaissa-bot
   main-is:             Main.hs
   default-language:    Haskell2010
   build-depends:
-      base             >= 4.7      && < 5
+      base                  >= 4.7      && < 5
     , kaissa-bot
+    , lens                  >= 4.15     && < 4.16
+    , mtl                   >= 2.2      && < 2.3
+    , optparse-applicative  >= 0.13     && < 0.14
+    , wai-extra             >= 3.0      && < 3.1
+    , warp                  >= 3.2      && < 3.3
   default-extensions:
     BangPatterns
     ConstraintKinds

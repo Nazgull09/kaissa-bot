@@ -1,3 +1,5 @@
 token: ""
 poll-timeout: 5
 poll-limit: 100
+detailed-logging: true
+port: 3000
