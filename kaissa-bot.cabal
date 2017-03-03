@@ -17,9 +17,20 @@ library
   hs-source-dirs:      src
   exposed-modules:
     Kaissa.Bot
+    Kaissa.Bot.API
+    Kaissa.Bot.Config
+    Kaissa.Bot.Monad
+    Kaissa.Bot.Server
   default-language:    Haskell2010
   build-depends:
-      base             >= 4.7     && < 5
+      base                >= 4.7     && < 5
+    , lens                >= 4.15    && < 4.16
+    , monad-control       >= 1.0     && < 1.1
+    , monad-logger        >= 0.3     && < 0.4
+    , mtl                 >= 2.2     && < 2.3
+    , servant             >= 0.10    && < 0.11
+    , servant-server      >= 0.10    && < 0.116
+    , transformers-base   >= 0.4     && < 0.5
   default-extensions:
     BangPatterns
     ConstraintKinds
@@ -35,6 +46,7 @@ library
     OverloadedStrings
     RecordWildCards
     ScopedTypeVariables
+    TemplateHaskell
     TupleSections
     TypeFamilies
     TypeOperators
