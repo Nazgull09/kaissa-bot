@@ -9,6 +9,7 @@ module Kaissa.Bot.Monad(
   -- * Helpers
   , getConfig
   , runTelegram
+  , pollTelegramUpdates
   , logInfo
   , logWarn
   , logError
@@ -23,6 +24,7 @@ import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.ByteString (ByteString)
+import Data.IORef
 import Data.Monoid
 import Data.Text (Text, pack)
 import Data.Text.Encoding
@@ -32,6 +34,10 @@ import Network.HTTP.Client.TLS  (tlsManagerSettings)
 import Servant.Common.Req
 import Servant.Server
 import Web.Telegram.API.Bot.API
+import Web.Telegram.API.Bot.API.Updates
+import Web.Telegram.API.Bot.Data
+import Web.Telegram.API.Bot.Requests
+import Web.Telegram.API.Bot.Responses
 
 import qualified Data.ByteString.Lazy as BL
 
@@ -41,15 +47,19 @@ data ServerEnv = ServerEnv {
   serverConfig  :: !Config
   -- | HTTPS client manager
 , serverManager :: !Manager
+  -- | ID of last processed update from Telegram
+, serverTelegramOffset :: !(IORef (Maybe Int))
 }
 
 -- | Create fresh server environment
 newServerEnv :: Config -> IO ServerEnv
 newServerEnv cfg = do
   mng <- newManager tlsManagerSettings
+  offsetRef <- liftIO $ newIORef Nothing
   pure ServerEnv {
       serverConfig  = cfg
     , serverManager = mng
+    , serverTelegramOffset = offsetRef
     }
 
 -- | Main monad of server, each handler of API operates in the monad.
@@ -105,3 +115,21 @@ runTelegram' m = do
       logInfoN $ "runTelegram: " <> showt err
       throwError err500 { errBody = BL.fromStrict $ showb err }
     Right a -> pure a
+
+-- | Poll next updates from Telegram server
+pollTelegramUpdates :: ServerM [Update]
+pollTelegramUpdates = do
+  cfg <- getConfig
+  offsetRef <- ServerM $ asks serverTelegramOffset
+  offset <- liftIO $ readIORef offsetRef
+  mng <- getManager
+  let token = Token $ cfg ^. configToken
+  res <- liftIO $ getUpdates token offset (cfg ^. configPollLimit) (cfg ^. configPollTimeout) mng
+  case res of
+    Left e -> do
+      logInfoN $ "pollTelegramUpdates: " <> showt e
+      throwError err500 { errBody = BL.fromStrict $ showb e }
+    Right resp -> do
+      let upds = result resp
+      unless (null upds) $ liftIO $ writeIORef offsetRef (Just . maximum . fmap update_id $ upds)
+      return upds
