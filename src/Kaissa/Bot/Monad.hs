@@ -8,12 +8,18 @@ module Kaissa.Bot.Monad(
   , serverMToHandler
   -- * Helpers
   , getConfig
+  , logInfo
+  , logWarn
+  , logError
+  , logDebug
+  , showt
   ) where
 
 import Control.Monad.Base
 import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
+import Data.Text (Text, pack)
 import Kaissa.Bot.Config
 import Network.HTTP.Client      (newManager, Manager)
 import Network.HTTP.Client.TLS  (tlsManagerSettings)
@@ -38,7 +44,7 @@ newServerEnv cfg = do
 
 -- | Main monad of server, each handler of API operates in the monad.
 newtype ServerM a = ServerM { unServerM :: ReaderT ServerEnv (LoggingT Handler) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadBase IO)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadBase IO, MonadLogger)
 
 -- | Helper for 'MonadBaseControl' instance
 newtype StMServerM a = StMServerM { unStMServerM :: StM (ReaderT ServerEnv (LoggingT Handler)) a }
@@ -64,3 +70,7 @@ runServerM e m = runStdoutLoggingT $ runReaderT (unServerM m) e
 -- | Transformation from 'ServerM' monad to 'Handler'
 serverMToHandler :: ServerEnv -> ServerM :~> Handler
 serverMToHandler e = NT (runServerM e)
+
+-- | Shortcut for displaying something as text
+showt :: Show a => a -> Text
+showt = pack . show
