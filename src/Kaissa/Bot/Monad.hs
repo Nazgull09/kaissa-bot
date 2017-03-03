@@ -10,23 +10,30 @@ module Kaissa.Bot.Monad(
   , getConfig
   ) where
 
+import Control.Monad.Base
 import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
-import Control.Monad.Base
 import Kaissa.Bot.Config
+import Network.HTTP.Client      (newManager, Manager)
+import Network.HTTP.Client.TLS  (tlsManagerSettings)
 import Servant.Server
 
 -- | Environment of 'ServerM' monad
 data ServerEnv = ServerEnv {
-  serverConfig :: !Config
+  -- | Stored server config
+  serverConfig  :: !Config
+  -- | HTTPS client manager
+, serverManager :: !Manager
 }
 
 -- | Create fresh server environment
 newServerEnv :: Config -> IO ServerEnv
 newServerEnv cfg = do
+  mng <- newManager tlsManagerSettings
   pure ServerEnv {
-      serverConfig = cfg
+      serverConfig  = cfg
+    , serverManager = mng
     }
 
 -- | Main monad of server, each handler of API operates in the monad.
@@ -45,6 +52,10 @@ instance MonadBaseControl IO ServerM where
 -- | Getting server configuration
 getConfig :: ServerM Config
 getConfig = ServerM $ asks serverConfig
+
+-- | Getting manager for connecting another servers
+getManager :: ServerM Manager
+getManager = ServerM $ asks serverManager
 
 -- | Execute server monad to default servant handler
 runServerM :: ServerEnv -> ServerM a -> Handler a
