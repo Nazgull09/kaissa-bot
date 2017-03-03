@@ -10,6 +10,7 @@ module Kaissa.Bot.Monad(
   -- * Helpers
   , getConfig
   , runTelegram
+  , runTelegram'
   , pollTelegramUpdates
   , logInfo
   , logWarn

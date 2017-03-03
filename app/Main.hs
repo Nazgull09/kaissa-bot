@@ -28,7 +28,7 @@ optionsParser = Options
 runServer :: Options -> IO ()
 runServer Options{..} = do
   cfg <- readConfig configPath
-  env <- newServerEnv cfg (liftIO . print)
+  env <- newServerEnv cfg testHelloRespond
   let logger = makeLogger $ cfg ^. configDetailedLogging
   run (cfg ^. configPort) $ logger $ serverApp env
   where
